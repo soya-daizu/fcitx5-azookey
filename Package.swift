@@ -33,6 +33,11 @@ let package = Package(
             name: "KanaKanjiConverterModule",
             targets: ["KanaKanjiConverterModule"]
         ),
+        .library(
+            name: "Fcitx5BridgeModule",
+            type: .dynamic,
+            targets: ["Fcitx5BridgeModule"]
+        ),
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
@@ -76,6 +81,12 @@ let package = Package(
             ],
             swiftSettings: swiftSettings
         ),
+        .target(
+            name: "Fcitx5BridgeModule",
+            dependencies: [
+                "KanaKanjiConverterModuleWithDefaultDictionary"
+            ]
+        ),
         .executableTarget(
             name: "CliTool",
             dependencies: [
@@ -104,6 +115,10 @@ let package = Package(
                 .product(name: "Collections", package: "swift-collections")
             ],
             swiftSettings: swiftSettings
-        )
+        ),
+        .testTarget(
+            name: "Fcitx5BridgeModuleTests",
+            dependencies: ["Fcitx5BridgeModule"]
+        ),
     ]
 )

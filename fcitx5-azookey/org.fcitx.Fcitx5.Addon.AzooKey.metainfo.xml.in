@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component type="addon">
+  <id>org.fcitx.Fcitx5.Addon.AzooKey</id>
+  <extends>org.fcitx.Fcitx5</extends>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <name>azooKey for Fcitx 5</name>
+  <summary>Kana-Kanji Conversion Module written in Swift</summary>
+  <developer id="org.openvanilla.azookey">
+    <name>The azooKey Authors</name>
+  </developer>
+  <url type="homepage">https://azookey.netlify.app/</url>
+  <url type="bugtracker">https://github.com/ensan-hcl/azooKey/issues</url>
+  <project_group>Fcitx</project_group>
+  <releases>
+    <release version="0.1.0" date="2024-06-18"/>
+  </releases>
+  <content_rating type="oars-1.1"/>
+</component>

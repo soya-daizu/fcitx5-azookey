@@ -1,0 +1,7 @@
+[InputMethod]
+Name=azooKey
+Icon=fcitx-azookey
+Label=aK
+LangCode=ja
+Addon=azookey
+Configurable=True

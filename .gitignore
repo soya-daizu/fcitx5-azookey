@@ -18,3 +18,5 @@ Package.resolved
 .docc-build
 .vscode
 *.gguf
+.cache
+/fcitx5-azookey/build

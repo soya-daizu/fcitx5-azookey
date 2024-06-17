@@ -1,0 +1,36 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR OpenVanilla
+# This file is distributed under the same license as the fcitx5-mcbopomofo package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: fcitx5-azookey\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2024-06-18 06:30+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: src/azookey.conf.in.in:3 src/azookey-addon.conf.in.in:3
+msgid "azooKey"
+msgstr ""
+
+#: src/azookey-addon.conf.in.in:4
+msgid "azooKey Input Method For Fcitx"
+msgstr ""
+
+#: org.fcitx.Fcitx5.Addon.AzooKey.metainfo.xml.in:7
+msgid "azooKey for Fcitx 5"
+msgstr ""
+
+#: org.fcitx.Fcitx5.Addon.AzooKey.metainfo.xml.in:8
+msgid "Kana-Kanji Conversion Module written in Swift"
+msgstr ""
+

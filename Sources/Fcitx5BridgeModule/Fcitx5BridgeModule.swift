@@ -38,7 +38,6 @@ public func composingTextReset(rawPtr: OpaquePointer) {
     var composingText = ptr.pointee
 
     composingText.stopComposition()
-    print(composingText)
 
     ptr.initialize(to: composingText)
 }
@@ -50,7 +49,6 @@ public func composingTextInsert(rawPtr: OpaquePointer, text: UnsafePointer<CChar
 
     let text = String(cString: text)
     composingText.insertAtCursorPosition(text, inputStyle: .roman2kana)
-    print(composingText)
 
     ptr.initialize(to: composingText)
 }
@@ -61,9 +59,48 @@ public func composingTextDeleteBackward(rawPtr: OpaquePointer) {
     var composingText = ptr.pointee
 
     composingText.deleteBackwardFromCursorPosition(count: 1)
-    print(composingText)
 
     ptr.initialize(to: composingText)
+}
+
+@_cdecl("ak_composing_text_delete_forward")
+public func composingTextDeleteForward(rawPtr: OpaquePointer) {
+    let ptr = UnsafeMutablePointer<ComposingText>(rawPtr)
+    var composingText = ptr.pointee
+
+    composingText.deleteForwardFromCursorPosition(count: 1)
+
+    ptr.initialize(to: composingText)
+}
+
+@_cdecl("ak_composing_text_move_cursor")
+public func composingTextMoveCursor(rawPtr: OpaquePointer, count: Int) -> Int {
+    let ptr = UnsafeMutablePointer<ComposingText>(rawPtr)
+    var composingText = ptr.pointee
+
+    let movedCount = composingText.moveCursorFromCursorPosition(count: count)
+
+    ptr.initialize(to: composingText)
+    return movedCount
+}
+
+@_cdecl("ak_composing_text_set_cursor")
+public func composingTextSetCursor(rawPtr: OpaquePointer, position: Int) -> Int {
+    let ptr = UnsafeMutablePointer<ComposingText>(rawPtr)
+    var composingText = ptr.pointee
+
+    let count: Int
+    if position < 0 {
+        let currentPosition = composingText.convertTarget.count
+        count = currentPosition + position + 1
+    } else {
+        let currentPosition = composingText.convertTargetCursorPosition
+        count = position - currentPosition
+    }
+    let movedCount = composingText.moveCursorFromCursorPosition(count: count)
+
+    ptr.initialize(to: composingText)
+    return movedCount
 }
 
 @_cdecl("ak_composing_text_is_composing")

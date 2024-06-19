@@ -6,6 +6,7 @@
  */
 #include "azookey.h"
 #include "BridgingHeader.h"
+#include "keyaction.h"
 
 // AzookeyState
 
@@ -17,14 +18,62 @@ AzookeyState::AzookeyState(AzookeyEngine *engine, fcitx::InputContext *ic)
 void AzookeyState::keyEvent(fcitx::KeyEvent &keyEvent) {
   FCITX_DEBUG() << "keyEvent: " << keyEvent.key();
 
+  KeyAction action = KeyAction(keyEvent.key());
+  if (action.isUnknown()) {
+    FCITX_DEBUG() << "unknown keyEvent: " << keyEvent.key();
+    return;
+  }
+
   bool isComposing = ak_composing_text_is_composing(composing_text_);
-  if (isComposing) {
-    if (keyEvent.key().check(FcitxKey_BackSpace)) {
-      ak_composing_text_delete_backward(composing_text_);
+  if (!isComposing) {
+    if (action.isInput()) {
+      ak_composing_text_insert(composing_text_, action.surface.c_str());
       updateUI();
       return keyEvent.filterAndAccept();
     }
-    if (keyEvent.key().check(FcitxKey_Return)) {
+  } else {
+    if (action.isInput()) {
+      ak_composing_text_insert(composing_text_, action.surface.c_str());
+      updateUI();
+      return keyEvent.filterAndAccept();
+    }
+    if (action.isDelete()) {
+      auto direction = action.deleteDirection();
+      switch (direction) {
+      case KeyAction::DeleteDirection::Backward:
+        ak_composing_text_delete_backward(composing_text_);
+        break;
+      case KeyAction::DeleteDirection::Forward:
+        ak_composing_text_delete_forward(composing_text_);
+        break;
+      default:
+        return;
+      }
+      updateUI();
+      return keyEvent.filterAndAccept();
+    }
+    if (action.isNavigation()) {
+      auto direction = action.navigationDirection();
+      switch (direction) {
+      case KeyAction::NavigationDirection::Left:
+        ak_composing_text_move_cursor(composing_text_, -1);
+        break;
+      case KeyAction::NavigationDirection::Right:
+        ak_composing_text_move_cursor(composing_text_, 1);
+        break;
+      case KeyAction::NavigationDirection::Home:
+        ak_composing_text_set_cursor(composing_text_, 0);
+        break;
+      case KeyAction::NavigationDirection::End:
+        ak_composing_text_set_cursor(composing_text_, -1);
+        break;
+      default:
+        return;
+      }
+      updateUI();
+      return keyEvent.filterAndAccept();
+    }
+    if (action.isEnter()) {
       const char *convertTarget =
           ak_composing_text_get_convert_target(composing_text_);
       ic_->commitString(convertTarget);
@@ -33,19 +82,11 @@ void AzookeyState::keyEvent(fcitx::KeyEvent &keyEvent) {
       reset();
       return keyEvent.filterAndAccept();
     }
-    if (keyEvent.key().check(FcitxKey_Escape)) {
+    if (action.isEscape()) {
       reset();
       return keyEvent.filterAndAccept();
     }
-  } else {
-    if (!keyEvent.key().isSimple()) {
-      return;
-    }
   }
-
-  ak_composing_text_insert(composing_text_, keyEvent.key().toString().c_str());
-  updateUI();
-  return keyEvent.filterAndAccept();
 }
 
 void AzookeyState::updateUI() {

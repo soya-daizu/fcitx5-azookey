@@ -23,13 +23,17 @@ void ak_composing_text_insert(void *raw_ptr, const char *text);
 
 void ak_composing_text_delete_backward(void *raw_ptr);
 
+void ak_composing_text_delete_forward(void *raw_ptr);
+
+long ak_composing_text_move_cursor(void *raw_ptr, long count);
+
+long ak_composing_text_set_cursor(void *raw_ptr, long position);
+
 bool ak_composing_text_is_composing(void *raw_ptr);
 
 const char *ak_composing_text_get_convert_target(void *raw_ptr);
 
-int ak_composing_text_get_cursor_position(void *raw_ptr);
-
-void ak_request_candidates();
+long ak_composing_text_get_cursor_position(void *raw_ptr);
 
 #ifdef __cplusplus
 }

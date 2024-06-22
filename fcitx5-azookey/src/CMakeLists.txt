@@ -3,7 +3,13 @@ set(SWIFT_LIBRARY_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../.build/release")
 find_library(SWIFT_LIBRARY NAMES Fcitx5BridgeModule PATHS ${SWIFT_LIBRARY_PATH})
 # Include the bridging header directory
 
-add_library(azookey SHARED azookey.cpp)
+set(AZOOKEY_SOURCES
+  AzookeyEngine.cpp
+  AzookeyState.cpp
+  AzookeyCandidateList.cpp
+)
+
+add_library(azookey SHARED ${AZOOKEY_SOURCES})
 target_link_libraries(azookey PRIVATE Fcitx5::Core ${SWIFT_LIBRARY})
 target_include_directories(azookey PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../Sources/Fcitx5BridgeModule")
 set_target_properties(azookey PROPERTIES PREFIX "")

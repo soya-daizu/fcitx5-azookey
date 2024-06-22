@@ -1,7 +1,29 @@
-@_exported import KanaKanjiConverterModuleWithDefaultDictionary
+import KanaKanjiConverterModuleWithDefaultDictionary
 import Foundation
 
 // KanaKanjiConverter
+
+struct ConvertRequestOptions {
+  public let N_best: Int?;
+  public let requireJapanesePrediction: Bool?;
+}
+
+struct DicDataElement {
+  public let word: UnsafePointer<CChar>?
+  public let ruby: UnsafePointer<CChar>?
+}
+
+struct Candidate {
+    public let text: UnsafePointer<CChar>?
+    public let value: Float32
+    public let correspondingCount: Int
+    public let data: UnsafeMutablePointer<UnsafeMutablePointer<DicDataElement>?>
+}
+
+struct ConversionResult {
+    public let mainResults: UnsafeMutablePointer<UnsafeMutablePointer<Candidate>?>
+    public let firstClauseResults: UnsafeMutablePointer<UnsafeMutablePointer<Candidate>?>
+}
 
 @MainActor
 @_cdecl("ak_kana_kanji_converter_new")
@@ -15,6 +37,76 @@ public func kanaKanjiConverterNew() -> UnsafeRawPointer {
 public func kanaKanjiConverterDispose(rawPtr: OpaquePointer) {
     let ptr = UnsafeMutablePointer<KanaKanjiConverter>(rawPtr)
     ptr.deallocate()
+}
+
+@MainActor
+@_cdecl("ak_kana_kanji_converter_request_candidates")
+public func kanaKanjiConverterRequestCandidates(rawPtr: OpaquePointer, composingTextRawPtr: OpaquePointer, optionsRawPtr: OpaquePointer) -> UnsafeRawPointer {
+    let ptr = UnsafeMutablePointer<KanaKanjiConverter>(rawPtr)
+    let composingTextPtr = UnsafeMutablePointer<ComposingText>(composingTextRawPtr)
+    let optionsPtr = UnsafeMutablePointer<ConvertRequestOptions>(optionsRawPtr)
+    let converter = ptr.pointee
+    let composingText = composingTextPtr.pointee
+    let options = optionsPtr.pointee
+
+    let results = converter.requestCandidates(composingText, options: requestOptions(options: options))
+    print(results.mainResults.map { $0.text })
+    print(results.firstClauseResults.map { $0.text })
+
+    let mainResultsPtr = UnsafeMutablePointer<UnsafeMutablePointer<Candidate>?>.allocate(capacity: results.mainResults.count + 1)
+    for i in 0..<results.mainResults.count {
+        let candidate = results.mainResults[i]
+
+        let dataPtr = UnsafeMutablePointer<UnsafeMutablePointer<DicDataElement>?>.allocate(capacity: candidate.data.count + 1)
+        for j in 0..<candidate.data.count {
+            let item = candidate.data[j]
+            let ptr = UnsafeMutablePointer<DicDataElement>.allocate(capacity: 1)
+            ptr.initialize(to: DicDataElement(word: strdup(item.word), ruby: strdup(item.ruby)))
+            dataPtr[j] = ptr
+        }
+        dataPtr[candidate.data.count] = nil
+
+        let ptr = UnsafeMutablePointer<Candidate>.allocate(capacity: 1)
+        ptr.initialize(to: Candidate(
+            text: UnsafePointer(strdup(candidate.text)),
+            value: candidate.value,
+            correspondingCount: candidate.correspondingCount,
+            data: dataPtr
+        ))
+        mainResultsPtr[i] = ptr
+    }
+    mainResultsPtr[results.mainResults.count] = nil
+
+    let firstClauseResultsPtr = UnsafeMutablePointer<UnsafeMutablePointer<Candidate>?>.allocate(capacity: results.firstClauseResults.count + 1)
+    for i in 0..<results.firstClauseResults.count {
+        let candidate = results.firstClauseResults[i]
+
+        let dataPtr = UnsafeMutablePointer<UnsafeMutablePointer<DicDataElement>?>.allocate(capacity: candidate.data.count + 1)
+        for j in 0..<candidate.data.count {
+            let item = candidate.data[j]
+            let ptr = UnsafeMutablePointer<DicDataElement>.allocate(capacity: 1)
+            ptr.initialize(to: DicDataElement(word: strdup(item.word), ruby: strdup(item.ruby)))
+            dataPtr[j] = ptr
+        }
+        dataPtr[candidate.data.count] = nil
+
+        let ptr = UnsafeMutablePointer<Candidate>.allocate(capacity: 1)
+        ptr.initialize(to: Candidate(
+            text: UnsafePointer(strdup(candidate.text)),
+            value: candidate.value,
+            correspondingCount: candidate.correspondingCount,
+            data: dataPtr
+        ))
+        firstClauseResultsPtr[i] = ptr
+    }
+    firstClauseResultsPtr[results.firstClauseResults.count] = nil
+
+    let conversionResultPtr = UnsafeMutablePointer<ConversionResult>.allocate(capacity: 1)
+    conversionResultPtr.initialize(to: ConversionResult(
+        mainResults: mainResultsPtr,
+        firstClauseResults: firstClauseResultsPtr
+    ))
+    return UnsafeRawPointer(conversionResultPtr)
 }
 
 // ComposingText
@@ -110,6 +202,13 @@ public func composingTextIsComposing(rawPtr: OpaquePointer) -> Bool {
     return composingText.input.count > 0
 }
 
+@_cdecl("ak_composing_text_get_input_count")
+public func composingTextGetInputCount(rawPtr: OpaquePointer) -> Int {
+    let ptr = UnsafeMutablePointer<ComposingText>(rawPtr)
+    let composingText = ptr.pointee
+    return composingText.input.count
+}
+
 @_cdecl("ak_composing_text_get_convert_target")
 public func composingTextGetConvertTarget(rawPtr: OpaquePointer) -> UnsafePointer<CChar>? {
     let ptr = UnsafeMutablePointer<ComposingText>(rawPtr)
@@ -128,10 +227,10 @@ public func composingTextGetCursorPosition(rawPtr: OpaquePointer) -> Int {
     return composingText.convertTargetCursorPosition
 }
 
-func requestOptions() -> ConvertRequestOptions {
-    let option: ConvertRequestOptions = .withDefaultDictionary(
-        N_best: 10,
-        requireJapanesePrediction: true,
+func requestOptions(options: ConvertRequestOptions) -> KanaKanjiConverterModule.ConvertRequestOptions {
+    let result: KanaKanjiConverterModule.ConvertRequestOptions = .withDefaultDictionary(
+        N_best: options.N_best ?? 10,
+        requireJapanesePrediction: options.requireJapanesePrediction ?? true,
         requireEnglishPrediction: false,
         keyboardLanguage: .ja_JP,
         typographyLetterCandidate: false,
@@ -147,5 +246,5 @@ func requestOptions() -> ConvertRequestOptions {
         zenzaiMode: .off,
         metadata: .init(versionString: "anco for debugging")
     )
-    return option
+    return result
 }

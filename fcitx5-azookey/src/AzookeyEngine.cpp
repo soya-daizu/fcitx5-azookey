@@ -29,33 +29,34 @@ void AzookeyEngine::reset(const fcitx::InputMethodEntry &,
 }
 
 void AzookeyEngine::freeCandidateResult(ConversionResult *result) {
-  for (int i = 0; result->mainResults[i] != nullptr; i++) {
-    const Candidate *candidate = result->mainResults[i];
-    for (int j = 0; candidate->data[j] != nullptr; j++) {
-      const DicdataElement *element = candidate->data[j];
-      free((void *)element->word);
-      free((void *)element->ruby);
-      free((void *)element);
-    }
-    free((void *)candidate->text);
-    free((void *)candidate->data);
-    free((void *)candidate);
-  }
-  free((void *)result->mainResults);
-  for (int i = 0; result->firstClauseResults[i] != nullptr; i++) {
-    const Candidate *candidate = result->firstClauseResults[i];
-    for (int j = 0; candidate->data[j] != nullptr; j++) {
-      const DicdataElement *element = candidate->data[j];
-      free((void *)element->word);
-      free((void *)element->ruby);
-      free((void *)element);
-    }
-    free((void *)candidate->text);
-    free((void *)candidate->data);
-    free((void *)candidate);
-  }
-  free((void *)result->firstClauseResults);
+  freeCandidates(result->mainResults);
+  freeCandidates(result->firstClauseResults);
   free((void *)result);
+}
+
+void AzookeyEngine::freeSegmentedCandidateResult(
+    SegmentedConversionResult *result) {
+  for (int i = 0; result->mainResults[i] != nullptr; i++)
+    freeCandidates(result->mainResults[i]);
+  free((void *)result->mainResults);
+  free((void *)result->segmentResult);
+  free((void *)result);
+}
+
+void AzookeyEngine::freeCandidates(const Candidate **candidates) {
+  for (int i = 0; candidates[i] != nullptr; i++) {
+    const Candidate *candidate = candidates[i];
+    for (int j = 0; candidate->data[j] != nullptr; j++) {
+      const DicdataElement *element = candidate->data[j];
+      free((void *)element->word);
+      free((void *)element->ruby);
+      free((void *)element);
+    }
+    free((void *)candidate->text);
+    free((void *)candidate->data);
+    free((void *)candidate);
+  }
+  free((void *)candidates);
 }
 
 FCITX_ADDON_FACTORY(AzookeyEngineFactory);

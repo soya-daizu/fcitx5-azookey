@@ -25,6 +25,8 @@ public:
   auto kanaKanjiConverter() const { return kanaKanjiConverter_; }
 
   void freeCandidateResult(ConversionResult *result);
+  void freeSegmentedCandidateResult(SegmentedConversionResult *result);
+  void freeCandidates(const Candidate **candidate);
 
 private:
   fcitx::Instance *instance_;

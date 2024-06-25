@@ -25,6 +25,11 @@ struct ConversionResult {
     public let firstClauseResults: UnsafeMutablePointer<UnsafeMutablePointer<Candidate>?>
 }
 
+struct SegmentedConversionResult {
+    public let mainResults: UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<Candidate>?>?>
+    public let segmentResult: UnsafeMutablePointer<Int>
+}
+
 @MainActor
 @_cdecl("ak_kana_kanji_converter_new")
 public func kanaKanjiConverterNew() -> UnsafeRawPointer {
@@ -50,8 +55,8 @@ public func kanaKanjiConverterRequestCandidates(rawPtr: OpaquePointer, composing
     let options = optionsPtr.pointee
 
     let results = converter.requestCandidates(composingText, options: requestOptions(options: options))
-    print(results.mainResults.map { $0.text })
-    print(results.firstClauseResults.map { $0.text })
+    //print(results.mainResults.map { $0.text })
+    //print(results.firstClauseResults.map { $0.text })
 
     let mainResultsPtr = UnsafeMutablePointer<UnsafeMutablePointer<Candidate>?>.allocate(capacity: results.mainResults.count + 1)
     for i in 0..<results.mainResults.count {
@@ -105,6 +110,72 @@ public func kanaKanjiConverterRequestCandidates(rawPtr: OpaquePointer, composing
     conversionResultPtr.initialize(to: ConversionResult(
         mainResults: mainResultsPtr,
         firstClauseResults: firstClauseResultsPtr
+    ))
+    return UnsafeRawPointer(conversionResultPtr)
+}
+
+@MainActor
+@_cdecl("ak_kana_kanji_converter_request_candidates_with_segments")
+public func kanaKanjiConverterRequestCandidates(rawPtr: OpaquePointer, composingTextRawPtr: OpaquePointer, segmentsRawPtr: OpaquePointer?, optionsRawPtr: OpaquePointer) -> UnsafeRawPointer {
+    let ptr = UnsafeMutablePointer<KanaKanjiConverter>(rawPtr)
+    let composingTextPtr = UnsafeMutablePointer<ComposingText>(composingTextRawPtr)
+    let segmentsPtr = UnsafeMutablePointer<Int?>(segmentsRawPtr)
+    let optionsPtr = UnsafeMutablePointer<ConvertRequestOptions>(optionsRawPtr)
+    let converter = ptr.pointee
+    let composingText = composingTextPtr.pointee
+    let options = optionsPtr.pointee
+
+    var segments: [Int]?
+    if (segmentsPtr != nil) {
+      segments = [Int]()
+      while segmentsPtr![segments!.count] != nil {
+          segments!.append(Int(segmentsPtr![segments!.count]!))
+      }
+    }
+
+    let results = converter.requestCandidatesWithSegments(composingText, segments: segments, options: requestOptions(options: options))
+    print(results)
+
+    let resultsPtr = UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<Candidate>?>?>.allocate(capacity: results.mainResults.count + 1)
+    for i in 0..<results.mainResults.count {
+        let candidates = results.mainResults[i]
+        let candidatesPtr = UnsafeMutablePointer<UnsafeMutablePointer<Candidate>?>.allocate(capacity: candidates.count + 1)
+        for j in 0..<candidates.count {
+            let candidate = candidates[j]
+
+            let dataPtr = UnsafeMutablePointer<UnsafeMutablePointer<DicDataElement>?>.allocate(capacity: candidate.data.count + 1)
+            for k in 0..<candidate.data.count {
+                let item = candidate.data[k]
+                let ptr = UnsafeMutablePointer<DicDataElement>.allocate(capacity: 1)
+                ptr.initialize(to: DicDataElement(word: strdup(item.word), ruby: strdup(item.ruby)))
+                dataPtr[k] = ptr
+            }
+            dataPtr[candidate.data.count] = nil
+
+            let ptr = UnsafeMutablePointer<Candidate>.allocate(capacity: 1)
+            ptr.initialize(to: Candidate(
+                text: UnsafePointer(strdup(candidate.text)),
+                value: candidate.value,
+                correspondingCount: candidate.correspondingCount,
+                data: dataPtr
+            ))
+            candidatesPtr[j] = ptr
+        }
+        candidatesPtr[candidates.count] = nil
+        resultsPtr[i] = candidatesPtr
+    }
+    resultsPtr[results.mainResults.count] = nil
+
+    let segmentResultPtr = UnsafeMutablePointer<Int>.allocate(capacity: results.segmentResult.count + 1)
+    for i in 0..<results.segmentResult.count {
+        segmentResultPtr[i] = results.segmentResult[i]
+    }
+    segmentResultPtr[results.segmentResult.count] = -1
+
+    let conversionResultPtr = UnsafeMutablePointer<SegmentedConversionResult>.allocate(capacity: 1)
+    conversionResultPtr.initialize(to: SegmentedConversionResult(
+        mainResults: resultsPtr,
+        segmentResult: segmentResultPtr
     ))
     return UnsafeRawPointer(conversionResultPtr)
 }

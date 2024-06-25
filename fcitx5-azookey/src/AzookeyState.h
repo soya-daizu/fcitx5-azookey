@@ -38,6 +38,11 @@ private:
   }
   InputState inputState_ = InputState::None;
   InputState lastInputState_ = InputState::None;
+
+  std::vector<long> segments_;
+  int segmentIndex_{};
+  std::vector<std::vector<std::string>> segmentCandidates_;
+  std::vector<int> segmentCandidateIndexes_;
 };
 
 #endif // _FCITX5_AZOOKEY_AZOOKEYSTATE_H_

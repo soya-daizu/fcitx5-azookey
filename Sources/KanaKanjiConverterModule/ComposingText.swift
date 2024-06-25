@@ -368,6 +368,18 @@ public struct ComposingText: Sendable {
         self.convertTarget = ""
         self.convertTargetCursorPosition = 0
     }
+
+    public func splitBySegments(_ segments: [Int]) -> [ComposingText] {
+        var result: [ComposingText] = []
+        var inputIndex = 0
+        for segment in segments {
+            let input = self.input[inputIndex ..< inputIndex + segment]
+            let convertTarget = Self.getConvertTarget(for: self.input[inputIndex ..< inputIndex + segment])
+            result.append(ComposingText(convertTargetCursorPosition: 0, input: Array(input), convertTarget: convertTarget))
+            inputIndex += segment
+        }
+        return result
+    }
 }
 
 // MARK: 部分領域の計算のためのAPI

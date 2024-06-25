@@ -426,6 +426,7 @@ import SwiftUtils
             let candidates = self.getUniqueCandidate(self.getAdditionalCandidate(inputData, options: options))
             return ConversionResult(mainResults: candidates, firstClauseResults: candidates)   // アーリーリターン
         }
+
         let clauseCandidates: [Candidate] = clauseResult.map {(candidateData: CandidateData) -> Candidate in
             let first = candidateData.clauses.first!
             var count = 0
@@ -555,6 +556,84 @@ import SwiftUtils
         return ConversionResult(mainResults: result, firstClauseResults: Array(clause_candidates))
     }
 
+    private func processResultWithSegments(inputData: ComposingText, segments: [Int]?, result: (result: LatticeNode, nodes: [[LatticeNode]]), options: ConvertRequestOptions) -> SegmentedConversionResult {
+        var clauseResult = result.result.getCandidateData()
+        let segments = segments != nil ? segments! : {
+            var segmentationCandidate: ([Int], Float)?
+            for candidateData in clauseResult {
+                let value = candidateData.clauses.map({$0.value}).reduce(0, +) / Float(candidateData.clauses.count)
+                if segmentationCandidate == nil || value > segmentationCandidate!.1 {
+                    let counts = candidateData.clauses.map({$0.clause.inputRange.count})
+                    segmentationCandidate = (counts, value)
+                }
+            }
+            return segmentationCandidate!.0
+        }()
+        clauseResult = clauseResult.filter {(candidateData: CandidateData) -> Bool in
+            let clauseCount = candidateData.clauses.count
+            if clauseCount != segments.count { return false }
+            for i in 0..<clauseCount {
+                if candidateData.clauses[i].clause.inputRange.count != segments[i] { return false }
+            }
+            return true
+        }
+
+        var candidatesForSegments = [[Candidate]](repeating: [], count: segments.count)
+        for candidateData in clauseResult {
+            var dicDataIdx = 0
+            for j in 0..<candidateData.clauses.count {
+                let dicDataStartIdx = dicDataIdx
+                let clause = candidateData.clauses[j]
+                do {
+                    var str = ""
+                    while dicDataIdx < candidateData.data.count {
+                        str += candidateData.data[dicDataIdx].word
+                        dicDataIdx += 1
+                        if str == clause.clause.text {
+                            break
+                        }
+                    }
+                }
+
+                candidatesForSegments[j].append(
+                    Candidate(
+                        text: clause.clause.text,
+                        value: clause.value,
+                        correspondingCount: clause.clause.inputRange.count,
+                        lastMid: clause.clause.mid,
+                        data: Array(candidateData.data[dicDataStartIdx...dicDataIdx-1])
+                    )
+                )
+            }
+        }
+        for i in 0..<candidatesForSegments.count {
+            candidatesForSegments[i] = self.getUniqueCandidate(candidatesForSegments[i]).sorted { $0.value > $1.value }
+        }
+
+        let inputDataSplitBySegments = inputData.splitBySegments(segments)
+        for (i, segmentInputData) in inputDataSplitBySegments.enumerated() {
+            var seenCandidate: Set<String> = candidatesForSegments[i].mapSet {$0.text}
+
+            let additionalCandidates: [Candidate] = self.getUniqueCandidate(self.getAdditionalCandidate(segmentInputData, options: options), seenCandidates: seenCandidate)
+            var word_candidates = additionalCandidates
+            seenCandidate.formUnion(word_candidates.map {$0.text})
+
+            let wise_candidates: [Candidate] = self.getUniqueCandidate(self.getWiseCandidate(segmentInputData, options: options), seenCandidates: seenCandidate)
+            word_candidates.insert(contentsOf: wise_candidates, at: min(5, word_candidates.endIndex))
+
+            candidatesForSegments[i].append(contentsOf: word_candidates)
+
+            candidatesForSegments[i].mutatingForeach { item in
+                item.withActions(self.getAppropriateActions(item))
+                item.parseTemplate()
+            }
+        }
+
+        print(candidatesForSegments.map { $0.map { $0.text } })
+        return SegmentedConversionResult(mainResults: candidatesForSegments, segmentResult: segments)
+    }
+
+
     /// 入力からラティスを構築する関数。状況に応じて呼ぶ関数を分ける。
     /// - Parameters:
     ///   - inputData: 変換対象のInputData。
@@ -673,6 +752,23 @@ import SwiftUtils
         }
 
         return self.processResult(inputData: inputData, result: result, options: options)
+    }
+
+    public func requestCandidatesWithSegments(_ inputData: ComposingText, segments: [Int]?, options: ConvertRequestOptions) -> SegmentedConversionResult {
+        debug("requestCandidatesWithSegments 入力は", inputData)
+        // 変換対象が無の場合
+        if inputData.convertTarget.isEmpty {
+            return SegmentedConversionResult(mainResults: [], segmentResult: [])
+        }
+
+        // DicdataStoreにRequestOptionを通知する
+        self.sendToDicdataStore(.setRequestOptions(options))
+
+        guard let result = self.convertToLattice(inputData, N_best: options.N_best, zenzaiMode: options.zenzaiMode) else {
+            return SegmentedConversionResult(mainResults: [], segmentResult: [])
+        }
+
+        return self.processResultWithSegments(inputData: inputData, segments: segments, result: result, options: options)
     }
 
     /// 変換確定後の予測変換候補を要求する関数

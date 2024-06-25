@@ -191,6 +191,40 @@ void AzookeyState::keyEvent(fcitx::KeyEvent &keyEvent) {
   }
 
   if (inputState_ == InputState::ClausePreviewing) {
+    if (action.isNavigation()) {
+      auto direction = action.navigationDirection();
+      switch (direction) {
+      case KeyAction::NavigationDirection::Left:
+        segmentIndex_--;
+        if (segmentIndex_ < 0)
+          segmentIndex_ = segments_.size() - 1;
+        break;
+      case KeyAction::NavigationDirection::Right:
+        segmentIndex_++;
+        if (segmentIndex_ >= (int)segments_.size())
+          segmentIndex_ = 0;
+        break;
+      default:
+        return;
+      }
+
+      setInputState(InputState::ClausePreviewing);
+      updateUI();
+      return keyEvent.filterAndAccept();
+    }
+    if (action.isSpace()) {
+      setInputState(InputState::ClauseSelecting);
+      updateUI();
+      return keyEvent.filterAndAccept();
+    }
+    if (action.isEscape()) {
+      setInputState(InputState::Composing);
+      updateUI();
+      return keyEvent.filterAndAccept();
+    }
+  }
+
+  if (inputState_ == InputState::ClauseSelecting) {
     if (action.isEscape()) {
       setInputState(InputState::Composing);
       updateUI();
@@ -250,27 +284,56 @@ void AzookeyState::updateUI() {
   }
 
   if (inputState_ == InputState::ClausePreviewing) {
-    void *converter = engine_->kanaKanjiConverter();
-    ConvertRequestOptions options = {
-        .N_best = 9,
-        .requireJapanesePrediction = false,
-    };
-    ConversionResult *result = ak_kana_kanji_converter_request_candidates(
-        converter, composingText_, &options);
+    inputPanel.reset();
+    if (lastInputState_ != InputState::ClausePreviewing) {
+      void *converter = engine_->kanaKanjiConverter();
+      ConvertRequestOptions options = {
+          .N_best = 9,
+          .requireJapanesePrediction = false,
+      };
+      SegmentedConversionResult *result =
+          ak_kana_kanji_converter_request_candidates_with_segments(
+              converter, composingText_, nullptr, &options);
 
-    const Candidate *fullLengthCandidate = result->mainResults[0];
-    const Candidate *firstClauseCandidate = result->firstClauseResults[0];
-    preeditText.append(firstClauseCandidate->text,
-                       fcitx::TextFormatFlag::HighLight);
-    for (int i = 0; fullLengthCandidate->data[i] != nullptr; i++) {
-      const DicdataElement *element = fullLengthCandidate->data[i];
-      FCITX_INFO() << "element: " << element->word << " " << element->ruby;
+      const Candidate ***segmentCandidates = result->mainResults;
+      const long *segmentResult = result->segmentResult;
 
-      preeditText.append(element->word, fcitx::TextFormatFlag::Underline);
+      segmentCandidates_ = {};
+      segmentCandidateIndexes_ = {};
+      for (int i = 0; segmentCandidates[i] != nullptr; i++) {
+        segmentCandidates_.push_back({});
+        segmentCandidateIndexes_.push_back(0);
+        const Candidate **candidates = segmentCandidates[i];
+        for (int j = 0; candidates[j] != nullptr; j++) {
+          const Candidate *candidate = candidates[j];
+          segmentCandidates_.back().push_back(candidate->text);
+        }
+      }
+
+      int segmentLength = 0;
+      for (; segmentResult[segmentLength] != -1; segmentLength++) {
+      }
+      segments_ =
+          std::vector<long>(segmentResult, segmentResult + segmentLength);
+
+      engine_->freeSegmentedCandidateResult(result);
     }
-    preeditText.setCursor(0);
 
-    engine_->freeCandidateResult(result);
+    for (size_t i = 0; i < segmentCandidates_.size(); i++) {
+      size_t segmentCandidateIndex = segmentCandidateIndexes_[i];
+      if (i == (size_t)segmentIndex_) {
+        preeditText.setCursor(preeditText.textLength());
+        preeditText.append(segmentCandidates_[i][segmentCandidateIndex],
+                           fcitx::TextFormatFlag::HighLight);
+      } else {
+        preeditText.append(segmentCandidates_[i][segmentCandidateIndex],
+                           fcitx::TextFormatFlag::Underline);
+      }
+    }
+  }
+
+  if (inputState_ == InputState::ClauseSelecting) {
+    inputPanel.reset();
   }
 
   if (ic_->capabilityFlags().test(fcitx::CapabilityFlag::Preedit)) {

@@ -11,3 +11,8 @@ public struct ConversionResult: Sendable {
     /// 変換候補のうち最初の文節を変換したもの
     public var firstClauseResults: [Candidate]
 }
+
+public struct SegmentedConversionResult: Sendable {
+    public var mainResults: [[Candidate]]
+    public var segmentResult: [Int]
+}

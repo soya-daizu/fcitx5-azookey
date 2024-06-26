@@ -45,7 +45,7 @@ ConversionResult *ak_kana_kanji_converter_request_candidates(
 SegmentedConversionResult *
 ak_kana_kanji_converter_request_candidates_with_segments(
     void *raw_ptr, void *composing_text_raw_ptr, void *segments_raw_ptr,
-    ConvertRequestOptions *options_raw_ptr);
+    long segments_count, ConvertRequestOptions *options_raw_ptr);
 
 // ComposingText
 

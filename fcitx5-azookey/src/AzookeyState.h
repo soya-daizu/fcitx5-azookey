@@ -2,6 +2,7 @@
 #ifndef _FCITX5_AZOOKEY_AZOOKEYSTATE_H_
 #define _FCITX5_AZOOKEY_AZOOKEYSTATE_H_
 
+#include "AzookeyCandidateList.h"
 #include "BridgingHeader.h"
 #include <fcitx/inputcontext.h>
 #include <fcitx/inputcontextproperty.h>
@@ -22,6 +23,7 @@ public:
   ~AzookeyState() { ak_composing_text_dispose(composingText_); }
 
   void keyEvent(fcitx::KeyEvent &keyEvent);
+  void updateCandidates();
   void updateUI();
   void reset();
 
@@ -32,6 +34,7 @@ private:
 
   size_t getCharCount(const std::string &utf8Str);
   size_t getBytePosition(const std::string &utf8Str, size_t charPosition);
+
   void setInputState(InputState inputState) {
     lastInputState_ = inputState_;
     inputState_ = inputState;
@@ -39,10 +42,7 @@ private:
   InputState inputState_ = InputState::None;
   InputState lastInputState_ = InputState::None;
 
-  std::vector<long> segments_;
-  int segmentIndex_{};
-  std::vector<std::vector<std::string>> segmentCandidates_;
-  std::vector<int> segmentCandidateIndexes_;
+  std::unique_ptr<AzookeyCandidateList> tempCandidateList_;
 };
 
 #endif // _FCITX5_AZOOKEY_AZOOKEYSTATE_H_

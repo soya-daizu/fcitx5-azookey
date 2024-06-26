@@ -371,12 +371,14 @@ public struct ComposingText: Sendable {
 
     public func splitBySegments(_ segments: [Int]) -> [ComposingText] {
         var result: [ComposingText] = []
-        var inputIndex = 0
+        var remainingText = self
         for segment in segments {
-            let input = self.input[inputIndex ..< inputIndex + segment]
-            let convertTarget = Self.getConvertTarget(for: self.input[inputIndex ..< inputIndex + segment])
-            result.append(ComposingText(convertTargetCursorPosition: 0, input: Array(input), convertTarget: convertTarget))
-            inputIndex += segment
+            var text = remainingText
+            let index = text.forceGetInputCursorPosition(target: text.convertTarget.prefix(segment))
+            text.input = Array(text.input.prefix(index))
+            text.convertTarget = String(text.convertTarget.prefix(segment))
+            result.append(text)
+            remainingText.prefixComplete(correspondingCount: text.input.count)
         }
         return result
     }

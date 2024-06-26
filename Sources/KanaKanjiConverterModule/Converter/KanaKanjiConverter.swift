@@ -426,7 +426,6 @@ import SwiftUtils
             let candidates = self.getUniqueCandidate(self.getAdditionalCandidate(inputData, options: options))
             return ConversionResult(mainResults: candidates, firstClauseResults: candidates)   // アーリーリターン
         }
-
         let clauseCandidates: [Candidate] = clauseResult.map {(candidateData: CandidateData) -> Candidate in
             let first = candidateData.clauses.first!
             var count = 0
@@ -563,7 +562,9 @@ import SwiftUtils
             for candidateData in clauseResult {
                 let value = candidateData.clauses.map({$0.value}).reduce(0, +) / Float(candidateData.clauses.count)
                 if segmentationCandidate == nil || value > segmentationCandidate!.1 {
-                    let counts = candidateData.clauses.map({$0.clause.inputRange.count})
+                    let counts = candidateData.clauses.map({
+                        ComposingText.getConvertTarget(for: inputData.input[$0.clause.inputRange]).count
+                    })
                     segmentationCandidate = (counts, value)
                 }
             }
@@ -573,7 +574,7 @@ import SwiftUtils
             let clauseCount = candidateData.clauses.count
             if clauseCount != segments.count { return false }
             for i in 0..<clauseCount {
-                if candidateData.clauses[i].clause.inputRange.count != segments[i] { return false }
+                if ComposingText.getConvertTarget(for: inputData.input[candidateData.clauses[i].clause.inputRange]).count != segments[i] { return false }
             }
             return true
         }

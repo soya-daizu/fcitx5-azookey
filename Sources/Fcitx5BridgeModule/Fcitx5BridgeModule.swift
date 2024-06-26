@@ -116,25 +116,27 @@ public func kanaKanjiConverterRequestCandidates(rawPtr: OpaquePointer, composing
 
 @MainActor
 @_cdecl("ak_kana_kanji_converter_request_candidates_with_segments")
-public func kanaKanjiConverterRequestCandidates(rawPtr: OpaquePointer, composingTextRawPtr: OpaquePointer, segmentsRawPtr: OpaquePointer?, optionsRawPtr: OpaquePointer) -> UnsafeRawPointer {
+public func kanaKanjiConverterRequestCandidates(rawPtr: OpaquePointer, composingTextRawPtr: OpaquePointer, segmentsRawPtr: OpaquePointer?, segmentsCount: Int, optionsRawPtr: OpaquePointer) -> UnsafeRawPointer {
     let ptr = UnsafeMutablePointer<KanaKanjiConverter>(rawPtr)
     let composingTextPtr = UnsafeMutablePointer<ComposingText>(composingTextRawPtr)
-    let segmentsPtr = UnsafeMutablePointer<Int?>(segmentsRawPtr)
+    let segmentsPtr = UnsafeMutablePointer<Int>(segmentsRawPtr)
     let optionsPtr = UnsafeMutablePointer<ConvertRequestOptions>(optionsRawPtr)
     let converter = ptr.pointee
     let composingText = composingTextPtr.pointee
     let options = optionsPtr.pointee
 
+    let segmentsBufPtr = UnsafeBufferPointer<Int>(start: segmentsPtr, count: segmentsCount)
     var segments: [Int]?
-    if (segmentsPtr != nil) {
-      segments = [Int]()
-      while segmentsPtr![segments!.count] != nil {
-          segments!.append(Int(segmentsPtr![segments!.count]!))
-      }
+    if segmentsRawPtr != nil {
+        segments = [Int](unsafeUninitializedCapacity: segmentsCount, initializingWith: { arrayBuffer, count in
+            count = segmentsCount
+            for i in 0..<count {
+                arrayBuffer[i] = segmentsBufPtr[i]
+            }
+        })
     }
 
     let results = converter.requestCandidatesWithSegments(composingText, segments: segments, options: requestOptions(options: options))
-    print(results)
 
     let resultsPtr = UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<Candidate>?>?>.allocate(capacity: results.mainResults.count + 1)
     for i in 0..<results.mainResults.count {

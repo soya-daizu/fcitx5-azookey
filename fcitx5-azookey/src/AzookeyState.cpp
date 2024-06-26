@@ -37,6 +37,7 @@ void AzookeyState::keyEvent(fcitx::KeyEvent &keyEvent) {
     if (action.isInput()) {
       ak_composing_text_insert(composingText_, action.surface_.c_str());
       setInputState(InputState::Composing);
+      updateCandidates();
       updateUI();
       return keyEvent.filterAndAccept();
     }
@@ -50,16 +51,18 @@ void AzookeyState::keyEvent(fcitx::KeyEvent &keyEvent) {
         ak_composing_text_delete_forward(composingText_);
         break;
       default:
-        return;
+        return keyEvent.filterAndAccept();
       }
 
       bool isNotEmpty = ak_composing_text_is_composing(composingText_);
-      if (isNotEmpty)
+      if (isNotEmpty) {
         setInputState(InputState::Composing);
-      else
-        setInputState(InputState::None);
+        updateCandidates();
+        updateUI();
+      } else {
+        reset();
+      }
 
-      updateUI();
       return keyEvent.filterAndAccept();
     }
     if (action.isNavigation()) {
@@ -78,21 +81,23 @@ void AzookeyState::keyEvent(fcitx::KeyEvent &keyEvent) {
         ak_composing_text_set_cursor(composingText_, -1);
         break;
       default:
-        return;
+        return keyEvent.filterAndAccept();
       }
       setInputState(InputState::Composing);
       updateUI();
       return keyEvent.filterAndAccept();
     }
     if (action.isTab()) {
-      if (action.tabDirection() != KeyAction::TabDirection::Forward)
-        return;
-      setInputState(InputState::FullLengthSelecting);
-      updateUI();
+      if (action.tabDirection() == KeyAction::TabDirection::Forward) {
+        setInputState(InputState::FullLengthSelecting);
+        updateCandidates();
+        updateUI();
+      }
       return keyEvent.filterAndAccept();
     }
     if (action.isSpace()) {
       setInputState(InputState::ClausePreviewing);
+      updateCandidates();
       updateUI();
       return keyEvent.filterAndAccept();
     }
@@ -144,7 +149,7 @@ void AzookeyState::keyEvent(fcitx::KeyEvent &keyEvent) {
         candidateList->next();
         break;
       default:
-        return;
+        return keyEvent.filterAndAccept();
       }
 
       setInputState(InputState::FullLengthSelecting);
@@ -163,7 +168,7 @@ void AzookeyState::keyEvent(fcitx::KeyEvent &keyEvent) {
         candidateList->nextCandidate();
         break;
       default:
-        return;
+        return keyEvent.filterAndAccept();
       }
 
       setInputState(InputState::FullLengthSelecting);
@@ -193,28 +198,52 @@ void AzookeyState::keyEvent(fcitx::KeyEvent &keyEvent) {
   if (inputState_ == InputState::ClausePreviewing) {
     if (action.isNavigation()) {
       auto direction = action.navigationDirection();
+      auto candidateList = tempCandidateList_.get();
       switch (direction) {
+      case KeyAction::NavigationDirection::ShiftLeft:
+        if (candidateList->shiftSegment(false)) {
+          setInputState(InputState::ClausePreviewing);
+          updateCandidates();
+        }
+        break;
+      case KeyAction::NavigationDirection::ShiftRight:
+        if (candidateList->shiftSegment(true)) {
+          setInputState(InputState::ClausePreviewing);
+          updateCandidates();
+        }
+        break;
       case KeyAction::NavigationDirection::Left:
-        segmentIndex_--;
-        if (segmentIndex_ < 0)
-          segmentIndex_ = segments_.size() - 1;
+        candidateList->moveSegment(false);
+        candidateList->generateSegmentCandidates();
+        setInputState(InputState::ClausePreviewing);
         break;
       case KeyAction::NavigationDirection::Right:
-        segmentIndex_++;
-        if (segmentIndex_ >= (int)segments_.size())
-          segmentIndex_ = 0;
+        candidateList->moveSegment(true);
+        candidateList->generateSegmentCandidates();
+        setInputState(InputState::ClausePreviewing);
         break;
       default:
-        return;
+        return keyEvent.filterAndAccept();
       }
 
-      setInputState(InputState::ClausePreviewing);
       updateUI();
       return keyEvent.filterAndAccept();
     }
     if (action.isSpace()) {
+      auto candidateList = tempCandidateList_.get();
+      candidateList->nextCandidate();
       setInputState(InputState::ClauseSelecting);
       updateUI();
+      return keyEvent.filterAndAccept();
+    }
+    if (action.isEnter()) {
+      fcitx::Text preeditText;
+      if (ic_->capabilityFlags().test(fcitx::CapabilityFlag::Preedit))
+        preeditText = ic_->inputPanel().clientPreedit();
+      else
+        preeditText = ic_->inputPanel().preedit();
+      ic_->commitString(preeditText.toStringForCommit());
+      reset();
       return keyEvent.filterAndAccept();
     }
     if (action.isEscape()) {
@@ -225,11 +254,96 @@ void AzookeyState::keyEvent(fcitx::KeyEvent &keyEvent) {
   }
 
   if (inputState_ == InputState::ClauseSelecting) {
-    if (action.isEscape()) {
-      setInputState(InputState::Composing);
+    if (action.isNavigation()) {
+      auto direction = action.navigationDirection();
+      auto candidateList = std::dynamic_pointer_cast<AzookeyCandidateList>(
+          ic_->inputPanel().candidateList());
+      switch (direction) {
+      case KeyAction::NavigationDirection::Up:
+        candidateList->prevCandidate();
+        setInputState(InputState::ClauseSelecting);
+        break;
+      case KeyAction::NavigationDirection::Down:
+        candidateList->nextCandidate();
+        setInputState(InputState::ClauseSelecting);
+        break;
+      case KeyAction::NavigationDirection::ShiftLeft:
+        if (candidateList->shiftSegment(false)) {
+          setInputState(InputState::ClausePreviewing);
+          updateCandidates();
+        }
+        break;
+      case KeyAction::NavigationDirection::ShiftRight:
+        if (candidateList->shiftSegment(true)) {
+          setInputState(InputState::ClausePreviewing);
+          updateCandidates();
+        }
+        break;
+      case KeyAction::NavigationDirection::Left:
+        candidateList->moveSegment(false);
+        candidateList->generateSegmentCandidates();
+        setInputState(InputState::ClausePreviewing);
+        break;
+      case KeyAction::NavigationDirection::Right:
+        candidateList->moveSegment(true);
+        candidateList->generateSegmentCandidates();
+        setInputState(InputState::ClausePreviewing);
+        break;
+      default:
+        return keyEvent.filterAndAccept();
+      }
+
       updateUI();
       return keyEvent.filterAndAccept();
     }
+    if (action.isSpace()) {
+      auto candidateList = std::dynamic_pointer_cast<AzookeyCandidateList>(
+          ic_->inputPanel().candidateList());
+      candidateList->nextCandidate();
+      setInputState(InputState::ClauseSelecting);
+      updateUI();
+      return keyEvent.filterAndAccept();
+    }
+    if (action.isEnter()) {
+      fcitx::Text preeditText;
+      if (ic_->capabilityFlags().test(fcitx::CapabilityFlag::Preedit))
+        preeditText = ic_->inputPanel().clientPreedit();
+      else
+        preeditText = ic_->inputPanel().preedit();
+      ic_->commitString(preeditText.toStringForCommit());
+      reset();
+      return keyEvent.filterAndAccept();
+    }
+    if (action.isEscape()) {
+      setInputState(InputState::ClausePreviewing);
+      updateUI();
+      return keyEvent.filterAndAccept();
+    }
+  }
+}
+
+void AzookeyState::updateCandidates() {
+  if (inputState_ == InputState::Composing) {
+    tempCandidateList_ =
+        std::make_unique<AzookeyCandidateList>(engine_, ic_, composingText_);
+    tempCandidateList_->generateRealtimeCandidates();
+  }
+
+  if (inputState_ == InputState::FullLengthSelecting) {
+    tempCandidateList_ =
+        std::make_unique<AzookeyCandidateList>(engine_, ic_, composingText_);
+    tempCandidateList_->generateFullLengthCandidates();
+  }
+
+  if (inputState_ == InputState::ClausePreviewing) {
+    std::vector<long> segments;
+    if (tempCandidateList_)
+      segments = tempCandidateList_->segments();
+
+    tempCandidateList_ =
+        std::make_unique<AzookeyCandidateList>(engine_, ic_, composingText_);
+    tempCandidateList_->generateMultiSegmentCandidates(segments);
+    tempCandidateList_->generateSegmentCandidates();
   }
 }
 
@@ -251,28 +365,24 @@ void AzookeyState::updateUI() {
 
       int bytePosition = getBytePosition(convertTarget, cursorPosition);
       preeditText.setCursor(bytePosition);
-
       free((void *)convertTarget);
-    }
 
-    auto candidateList =
-        std::make_unique<AzookeyCandidateList>(engine_, ic_, composingText_);
-    candidateList->generateRealtimeCandidates();
-    inputPanel.setCandidateList(std::move(candidateList));
-    inputPanel.setAuxDown(fcitx::Text("[Tabキーで選択]"));
+      if (tempCandidateList_ && tempCandidateList_->totalSize() > 0) {
+        inputPanel.setCandidateList(std::move(tempCandidateList_));
+        inputPanel.setAuxDown(fcitx::Text("[Tabキーで選択]"));
+      }
+    }
   }
 
   if (inputState_ == InputState::FullLengthSelecting) {
-    if (lastInputState_ != InputState::FullLengthSelecting) {
-      auto candidateList =
-          std::make_unique<AzookeyCandidateList>(engine_, ic_, composingText_);
-      candidateList->generateFullLengthCandidates();
-      inputPanel.setCandidateList(std::move(candidateList));
-    }
+    inputPanel.reset();
+    if (tempCandidateList_)
+      inputPanel.setCandidateList(std::move(tempCandidateList_));
 
     auto candidateList = std::dynamic_pointer_cast<AzookeyCandidateList>(
         ic_->inputPanel().candidateList());
-    preeditText = candidateList->candidate(candidateList->cursorIndex()).text();
+    preeditText.append(candidateList->currentCandidateString(),
+                       fcitx::TextFormatFlag::HighLight);
 
     fcitx::Text auxDownText;
     auxDownText.append("[");
@@ -284,56 +394,33 @@ void AzookeyState::updateUI() {
   }
 
   if (inputState_ == InputState::ClausePreviewing) {
+    if (lastInputState_ == InputState::ClauseSelecting) {
+      auto candidateList = std::dynamic_pointer_cast<AzookeyCandidateList>(
+          ic_->inputPanel().candidateList());
+      tempCandidateList_ =
+          std::make_unique<AzookeyCandidateList>(*(candidateList.get()));
+    }
     inputPanel.reset();
-    if (lastInputState_ != InputState::ClausePreviewing) {
-      void *converter = engine_->kanaKanjiConverter();
-      ConvertRequestOptions options = {
-          .N_best = 9,
-          .requireJapanesePrediction = false,
-      };
-      SegmentedConversionResult *result =
-          ak_kana_kanji_converter_request_candidates_with_segments(
-              converter, composingText_, nullptr, &options);
 
-      const Candidate ***segmentCandidates = result->mainResults;
-      const long *segmentResult = result->segmentResult;
-
-      segmentCandidates_ = {};
-      segmentCandidateIndexes_ = {};
-      for (int i = 0; segmentCandidates[i] != nullptr; i++) {
-        segmentCandidates_.push_back({});
-        segmentCandidateIndexes_.push_back(0);
-        const Candidate **candidates = segmentCandidates[i];
-        for (int j = 0; candidates[j] != nullptr; j++) {
-          const Candidate *candidate = candidates[j];
-          segmentCandidates_.back().push_back(candidate->text);
-        }
-      }
-
-      int segmentLength = 0;
-      for (; segmentResult[segmentLength] != -1; segmentLength++) {
-      }
-      segments_ =
-          std::vector<long>(segmentResult, segmentResult + segmentLength);
-
-      engine_->freeSegmentedCandidateResult(result);
-    }
-
-    for (size_t i = 0; i < segmentCandidates_.size(); i++) {
-      size_t segmentCandidateIndex = segmentCandidateIndexes_[i];
-      if (i == (size_t)segmentIndex_) {
-        preeditText.setCursor(preeditText.textLength());
-        preeditText.append(segmentCandidates_[i][segmentCandidateIndex],
-                           fcitx::TextFormatFlag::HighLight);
-      } else {
-        preeditText.append(segmentCandidates_[i][segmentCandidateIndex],
-                           fcitx::TextFormatFlag::Underline);
-      }
-    }
+    if (tempCandidateList_)
+      preeditText = tempCandidateList_->buildWholeText();
   }
 
   if (inputState_ == InputState::ClauseSelecting) {
-    inputPanel.reset();
+    if (tempCandidateList_)
+      inputPanel.setCandidateList(std::move(tempCandidateList_));
+
+    auto candidateList = std::dynamic_pointer_cast<AzookeyCandidateList>(
+        ic_->inputPanel().candidateList());
+    preeditText = candidateList->buildWholeText();
+
+    fcitx::Text auxDownText;
+    auxDownText.append("[");
+    auxDownText.append(std::to_string(candidateList->globalCursorIndex() + 1));
+    auxDownText.append("/");
+    auxDownText.append(std::to_string(candidateList->totalSize()));
+    auxDownText.append("]");
+    inputPanel.setAuxDown(auxDownText);
   }
 
   if (ic_->capabilityFlags().test(fcitx::CapabilityFlag::Preedit)) {
@@ -384,5 +471,6 @@ size_t AzookeyState::getBytePosition(const std::string &utf8Str,
 void AzookeyState::reset() {
   ak_composing_text_reset(composingText_);
   setInputState(InputState::None);
+  tempCandidateList_.reset();
   updateUI();
 }

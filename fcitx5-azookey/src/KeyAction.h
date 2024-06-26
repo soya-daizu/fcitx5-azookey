@@ -5,7 +5,6 @@
 #include <fcitx-utils/key.h>
 #include <fcitx-utils/keysym.h>
 #include <fcitx-utils/keysymgen.h>
-#include <fcitx-utils/log.h>
 
 struct KeyAction {
   enum class Type {
@@ -23,6 +22,8 @@ struct KeyAction {
   enum class NavigationDirection {
     Left,
     Right,
+    ShiftLeft,
+    ShiftRight,
     Up,
     Down,
     Home,
@@ -60,6 +61,12 @@ struct KeyAction {
       return NavigationDirection::Left;
     if (key_.check(FcitxKey_Right) || key_.check(FcitxKey_KP_Right))
       return NavigationDirection::Right;
+    if (key_.check(FcitxKey_Left, fcitx::KeyState::Shift) ||
+        key_.check(FcitxKey_KP_Left, fcitx::KeyState::Shift))
+      return NavigationDirection::ShiftLeft;
+    if (key_.check(FcitxKey_Right, fcitx::KeyState::Shift) ||
+        key_.check(FcitxKey_KP_Right, fcitx::KeyState::Shift))
+      return NavigationDirection::ShiftRight;
     if (key_.check(FcitxKey_Up) || key_.check(FcitxKey_KP_Up))
       return NavigationDirection::Up;
     if (key_.check(FcitxKey_Down) || key_.check(FcitxKey_KP_Down))
@@ -83,16 +90,15 @@ struct KeyAction {
       : key_(key), surface_(fcitx::Key::keySymToUTF8(key.sym())) {
     if (key_.check(FcitxKey_Return))
       type_ = Type::Enter;
-    else if (key_.check(FcitxKey_Tab) ||
-             key_.check(FcitxKey_Tab, fcitx::KeyState::Shift))
+    else if (tabDirection() != TabDirection::Unknown)
       type_ = Type::Tab;
     else if (key_.check(FcitxKey_space) || key_.check(FcitxKey_KP_Space))
       type_ = Type::Space;
     else if (key_.check(FcitxKey_Escape))
       type_ = Type::Escape;
-    else if (key_.check(FcitxKey_BackSpace) || key_.check(FcitxKey_Delete))
+    else if (deleteDirection() != DeleteDirection::Unknown)
       type_ = Type::Delete;
-    else if (key_.isCursorMove())
+    else if (navigationDirection() != NavigationDirection::Unknown)
       type_ = Type::Navigation;
     else if (key_.isSimple())
       type_ = Type::Input;

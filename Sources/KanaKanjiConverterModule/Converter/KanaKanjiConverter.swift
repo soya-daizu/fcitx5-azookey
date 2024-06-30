@@ -568,13 +568,16 @@ import SwiftUtils
                     segmentationCandidate = (counts, value)
                 }
             }
+
+            if segmentationCandidate == nil { return [inputData.input.count] }
             return segmentationCandidate!.0
         }()
         clauseResult = clauseResult.filter {(candidateData: CandidateData) -> Bool in
             let clauseCount = candidateData.clauses.count
             if clauseCount != segments.count { return false }
             for i in 0..<clauseCount {
-                if ComposingText.getConvertTarget(for: inputData.input[candidateData.clauses[i].clause.inputRange]).count != segments[i] { return false }
+                let correspondingConvertTargetCount = ComposingText.getConvertTarget(for: inputData.input[candidateData.clauses[i].clause.inputRange]).count
+                if correspondingConvertTargetCount != segments[i] { return false }
             }
             return true
         }

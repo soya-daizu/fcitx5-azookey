@@ -65,6 +65,8 @@ public:
 
   // Multi-segment mode
   std::vector<long> segments() { return segments_; }
+  int segmentIndex() { return segmentIndex_; }
+  void setSegmentIndex(int segmentIndex) { segmentIndex_ = segmentIndex; }
   bool shiftSegment(bool forward) {
     if (forward) {
       if (segmentIndex_ + 1 < (int)segments_.size()) {
@@ -72,7 +74,7 @@ public:
         segments_[segmentIndex_]++;
         segments_[segmentIndex_ + 1]--;
         if (segments_[segmentIndex_ + 1] == 0)
-          segments_.pop_back();
+          segments_.erase(segments_.begin() + segmentIndex_ + 1);
         FCITX_INFO() << "after segments: " << segments_;
         return true;
       }

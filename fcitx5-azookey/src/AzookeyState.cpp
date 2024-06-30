@@ -269,14 +269,14 @@ void AzookeyState::keyEvent(fcitx::KeyEvent &keyEvent) {
         break;
       case KeyAction::NavigationDirection::ShiftLeft:
         if (candidateList->shiftSegment(false)) {
-          setInputState(InputState::ClausePreviewing);
           updateCandidates();
+          setInputState(InputState::ClausePreviewing);
         }
         break;
       case KeyAction::NavigationDirection::ShiftRight:
         if (candidateList->shiftSegment(true)) {
-          setInputState(InputState::ClausePreviewing);
           updateCandidates();
+          setInputState(InputState::ClausePreviewing);
         }
         break;
       case KeyAction::NavigationDirection::Left:
@@ -337,13 +337,31 @@ void AzookeyState::updateCandidates() {
 
   if (inputState_ == InputState::ClausePreviewing) {
     std::vector<long> segments;
-    if (tempCandidateList_)
+    int segmentIndex = 0;
+    if (tempCandidateList_) {
       segments = tempCandidateList_->segments();
+      segmentIndex = tempCandidateList_->segmentIndex();
+    }
 
     tempCandidateList_ =
         std::make_unique<AzookeyCandidateList>(engine_, ic_, composingText_);
     tempCandidateList_->generateMultiSegmentCandidates(segments);
     tempCandidateList_->generateSegmentCandidates();
+    tempCandidateList_->setSegmentIndex(segmentIndex);
+  }
+
+  if (inputState_ == InputState::ClauseSelecting) {
+    auto candidateList = std::dynamic_pointer_cast<AzookeyCandidateList>(
+        ic_->inputPanel().candidateList());
+
+    std::vector<long> segments = candidateList->segments();
+    int segmentIndex = candidateList->segmentIndex();
+
+    tempCandidateList_ =
+        std::make_unique<AzookeyCandidateList>(engine_, ic_, composingText_);
+    tempCandidateList_->generateMultiSegmentCandidates(segments);
+    tempCandidateList_->generateSegmentCandidates();
+    tempCandidateList_->setSegmentIndex(segmentIndex);
   }
 }
 
@@ -367,7 +385,7 @@ void AzookeyState::updateUI() {
       preeditText.setCursor(bytePosition);
       free((void *)convertTarget);
 
-      if (tempCandidateList_ && tempCandidateList_->totalSize() > 0) {
+      if (tempCandidateList_) {
         inputPanel.setCandidateList(std::move(tempCandidateList_));
         inputPanel.setAuxDown(fcitx::Text("[Tabキーで選択]"));
       }

@@ -611,12 +611,30 @@ import SwiftUtils
             candidatesForSegments[i] = self.getUniqueCandidate(candidatesForSegments[i]).sorted { $0.value > $1.value }
         }
 
+        var nodeIdx = 0
         let inputDataSplitBySegments = inputData.splitBySegments(segments)
         for (i, segmentInputData) in inputDataSplitBySegments.enumerated() {
             var seenCandidate: Set<String> = candidatesForSegments[i].mapSet {$0.text}
 
+            let dicCandidates: [Candidate] = result.nodes[nodeIdx]
+                .filter({ $0.inputRange.count == segmentInputData.input.count })
+                .map {
+                    Candidate(
+                        text: $0.data.word,
+                        value: $0.data.value(),
+                        correspondingCount: $0.inputRange.count,
+                        lastMid: $0.data.mid,
+                        data: [$0.data]
+                    )
+                }
+
             let additionalCandidates: [Candidate] = self.getUniqueCandidate(self.getAdditionalCandidate(segmentInputData, options: options), seenCandidates: seenCandidate)
-            var word_candidates = additionalCandidates
+            var word_candidates: [Candidate] = self.getUniqueCandidate(dicCandidates.chained(additionalCandidates), seenCandidates: seenCandidate)
+                .sorted {
+                    let count0 = $0.correspondingCount
+                    let count1 = $1.correspondingCount
+                    return count0 == count1 ? $0.value > $1.value : count0 > count1
+                }
             seenCandidate.formUnion(word_candidates.map {$0.text})
 
             let wise_candidates: [Candidate] = self.getUniqueCandidate(self.getWiseCandidate(segmentInputData, options: options), seenCandidates: seenCandidate)
@@ -628,6 +646,7 @@ import SwiftUtils
                 item.withActions(self.getAppropriateActions(item))
                 item.parseTemplate()
             }
+            nodeIdx += segmentInputData.input.count
         }
 
         print(candidatesForSegments.map { $0.map { $0.text } })
